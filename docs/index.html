@@ -57,3 +57,204 @@ import cats._, cats.implicits._
 
 ```scala
 scala> val F = Functor[List]
+F: cats.Functor[List] = cats.instances.ListInstances$$anon$1@7b2fd82e
+
+scala> val G = Functor[Option]
+G: cats.Functor[Option] = cats.instances.OptionInstances$$anon$1@2336ea2c
+
+scala> val H = F.compose(G)
+H: cats.Functor[[α]List[Option[α]]] = cats.Functor$$anon$1@7176b55
+
+scala> H.map(List(1.some, 2.some))(42 + _)
+res0: List[Option[Int]] = List(Some(43), Some(44))
+```
+
+--
+
+* `List` is a Functor
+
+--
+
+* `Option` is a Functor
+
+--
+
+* `Lambda[A => List[Option[A]]]` is, therefore, also a Functor
+
+---
+
+# Lifting
+
+--
+
+* Lets start by looking at a slightly different definition of map
+
+--
+
+```scala
+def lift[F[_]: Functor, A, B](f: A => B): F[A] => F[B] = _.map(f)
+```
+
+--
+
+* Because of the way Scala works this is somewhat unergonomic. 
+* I'm going to use this following definition for the rest of the slides
+* They are equivalent but this one has better type inference by using trickery
+
+--
+
+```scala
+
+final class LiftCurry[F[_]](val dummy: Boolean = false) extends AnyVal {
+  def apply[A, B](f: A => B)(implicit F: Functor[F]): F[A] => F[B] = _.map(f)
+}
+
+def liftF[F[_]]: LiftCurry[F] = new LiftCurry
+
+```
+
+---
+
+
+# Do You Even Lift Bro?
+
+--
+
+```scala
+scala> val add42 = (i: Int) => i + 42
+add42: Int => Int = $$Lambda$24187/661750452@34439c42
+
+scala> val o42 =  liftF[Option](add42)
+o42: Option[Int] => Option[Int] = LiftCurry$$$Lambda$24188/1898788491@493c5eb4
+
+scala> val lo42 = liftF[List](o42)
+lo42: List[Option[Int]] => List[Option[Int]] = LiftCurry$$$Lambda$24188/1898788491@58e3f39f
+
+scala> val flo42 = liftF[String => ?](lo42)
+flo42: (String => List[Option[Int]]) => (String => List[Option[Int]]) = LiftCurry$$$Lambda$24188/1898788491@44b2eb0c
+```
+
+---
+
+# And Now the Magic
+
+```scala
+scala> def ascii(s: String) = {
+     |   s.toList
+     |     .map(_.toInt)
+     |     .map(c => if (c < 256) c.some else none)
+     | }
+ascii: (s: String)List[Option[Int]]
+```
+
+--
+
+```scala
+scala> val g = flo42(ascii)
+g: String => List[Option[Int]] = scala.Function1$$Lambda$4348/1313057427@680ad77
+
+scala> val s = "😀 or 😢"
+s: String = 😀 or 😢
+
+scala> ascii(s)
+res1: List[Option[Int]] = List(None, None, Some(32), Some(111), Some(114), Some(32), None, None)
+
+scala> g(s)
+res2: List[Option[Int]] = List(None, None, Some(74), Some(153), Some(156), Some(74), None, None)
+```
+
+---
+
+# So?
+
+--
+
+* That was cool but what does it by us
+
+--
+
+* Functor instances allow us to lift operations through intermediate wrappers
+
+--
+
+* Applicatives do too but with even more power!
+
+---
+
+# Applicatives
+
+--
+
+* `abstract def ap[A, B](ff: F[(A) ⇒ B])(fa: F[A]): F[B]`
+
+--
+
+* this is part of the Applicative interface (bear in mind no one uses Applicative this way because its unpleasant in scala)
+
+--
+
+```scala
+scala> Applicative[Option].ap(add42.pure[Option])(1.some)
+res3: Option[Int] = Some(43)
+
+scala> Applicative[List].compose[Option].ap(add42.some.pure[List])(List(1.some, 2.some, 3.some))
+res4: List[Option[Int]] = List(Some(43), Some(44), Some(45))
+
+scala> val add43 = (i: Int) => i + 42 // Because why not...
+add43: Int => Int = $$Lambda$24245/273748774@329476c9
+
+scala> Applicative[List].compose[Option].ap(List(add42.some, none, add43.some))(List(1.some, 2.some, 3.some))
+res5: List[Option[Int]] = List(Some(43), Some(44), Some(45), None, None, None, Some(43), Some(44), Some(45))
+```
+
+---
+
+# Herein Lies Power
+
+```scala
+scala> 1 |+| 2
+res6: Int = 3
+
+scala> def add[M: Monoid](i: M)(j: M) = i |+| j
+add: [M](i: M)(j: M)(implicit evidence$1: cats.Monoid[M])M
+
+scala> val f = (add[Int] _).pure[Option].pure[Either[String, ?]]
+f: scala.util.Either[String,Option[Int => (Int => Int)]] = Right(Some($$Lambda$24281/1639810095@65eafc3a))
+
+scala> val ap1 = Applicative[Either[String, ?]].compose[Option].ap(f)(42.some.asRight)
+ap1: scala.util.Either[String,Option[Int => Int]] = Right(Some($$Lambda$24282/1192806800@30328e3d))
+
+scala> val ap2 = Applicative[Either[String, ?]].compose[Option].ap(ap1)(42.some.asRight)
+ap2: scala.util.Either[String,Option[Int]] = Right(Some(84))
+```
+
+--
+
+```scala
+scala> 42.asRight |+| 100.asRight
+res7: Either[B,Int] = Right(142)
+
+scala> 42.asRight[String] |+| Left("explode")
+res8: Either[String,Int] = Left(explode)
+```
+
+---
+
+# Remarks
+
+--
+
+* For lots of things we can just ignore intermediate layers for tons of stuff and just work in terms of 'pure' values 
+
+--
+
+* Lifting functions is how we can do that (see also mapN in cats which is a nicer version of what I did previously)
+
+ </textarea>
+    <script src="remark-latest.min.js">
+    </script>
+    <script>
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
