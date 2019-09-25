@@ -34,18 +34,18 @@ resolvers += Resolver.sonatypeRepo("releases")
 enablePlugins(TutPlugin)
 
 lazy val scalaTypeclasses = project.in(file("."))
-  .settings(moduleName := "scala-typeclasses")
+  .settings(moduleName := "tut-slides")
   .settings(settings: _*)
   .aggregate(core, slides)
   .dependsOn(core, slides)
 
 lazy val core = project
-  .settings(moduleName := "scala-typeclasses-core")
+  .settings(moduleName := "tut-slides-core")
   .settings(settings: _*)
 
 
 lazy val slides = project
-  .settings(moduleName := "scala-typeclasses-slides")
+  .settings(moduleName := "tut-slides-slides")
   .settings(settings: _*)
   .settings(
     tutTargetDirectory := baseDirectory.value / "../docs",

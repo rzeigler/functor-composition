@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Typeclasses in Scala</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif', 'Helvetica'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz', 'Gill Sans';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono', 'Consolas', 'Courier New'; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+# Functor Composition
+
+Ryan Zeigler
+
+---
+
+# Functors - A Recap
+
+--
+
+* Things with a map
+
+--
+
+* `Functor[F[_]] { def map[A, B](fa: F[A])(f: A => B): F[B] }`
+
+--
+
+* Thats it! We're done! 
+
+---
+
+# Some Boilerplate
+
+* You can follow along in a repl and this should work
+
+```scala
+import cats._, cats.implicits._
+```
+
+---
+
+# Functors Compose
+
+```scala
+scala> val F = Functor[List]

@@ -21,9 +21,203 @@
 
 class: center, middle
 
-# Title
+# Functor Composition
 
 Ryan Zeigler
+
+---
+
+# Functors - A Recap
+
+--
+
+* Things with a map
+
+--
+
+* `Functor[F[_]] { def map[A, B](fa: F[A])(f: A => B): F[B] }`
+
+--
+
+* Thats it! We're done! 
+
+---
+
+# Some Boilerplate
+
+* You can follow along in a repl and this should work
+
+```tut:silent
+import cats._, cats.implicits._
+```
+
+---
+
+# Functors Compose
+
+```tut
+val F = Functor[List]
+val G = Functor[Option]
+val H = F.compose(G)
+
+H.map(List(1.some, 2.some))(42 + _)
+```
+
+--
+
+* `List` is a Functor
+
+--
+
+* `Option` is a Functor
+
+--
+
+* `Lambda[A => List[Option[A]]]` is, therefore, also a Functor
+
+---
+
+# Lifting
+
+--
+
+* Lets start by looking at a slightly different definition of map
+
+--
+
+```tut:silent
+def lift[F[_]: Functor, A, B](f: A => B): F[A] => F[B] = _.map(f)
+```
+
+--
+
+* Because of the way Scala works this is somewhat unergonomic. 
+* I'm going to use this following definition for the rest of the slides
+* They are equivalent but this one has better type inference by using trickery
+
+--
+
+```tut:silent
+
+final class LiftCurry[F[_]](val dummy: Boolean = false) extends AnyVal {
+  def apply[A, B](f: A => B)(implicit F: Functor[F]): F[A] => F[B] = _.map(f)
+}
+
+def liftF[F[_]]: LiftCurry[F] = new LiftCurry
+
+```
+
+---
+
+
+# Do You Even Lift Bro?
+
+--
+
+```tut
+val add42 = (i: Int) => i + 42
+val o42 =  liftF[Option](add42)
+val lo42 = liftF[List](o42)
+val flo42 = liftF[String => ?](lo42)
+```
+
+---
+
+# And Now the Magic
+
+```tut
+def ascii(s: String) = {
+  s.toList
+    .map(_.toInt)
+    .map(c => if (c < 256) c.some else none)
+}
+```
+
+--
+
+```tut
+val g = flo42(ascii)
+val s = "😀 or 😢"
+ascii(s)
+g(s)
+
+```
+
+---
+
+# So?
+
+--
+
+* That was cool but what does it by us
+
+--
+
+* Functor instances allow us to lift operations through intermediate wrappers
+
+--
+
+* Applicatives do too but with even more power!
+
+---
+
+# Applicatives
+
+--
+
+* `abstract def ap[A, B](ff: F[(A) ⇒ B])(fa: F[A]): F[B]`
+
+--
+
+* this is part of the Applicative interface (bear in mind no one uses Applicative this way because its unpleasant in scala)
+
+--
+
+```tut
+Applicative[Option].ap(add42.pure[Option])(1.some)
+
+Applicative[List].compose[Option].ap(add42.some.pure[List])(List(1.some, 2.some, 3.some))
+
+
+val add43 = (i: Int) => i + 42 // Because why not...
+Applicative[List].compose[Option].ap(List(add42.some, none, add43.some))(List(1.some, 2.some, 3.some))
+```
+
+---
+
+# Herein Lies Power
+
+```tut
+
+1 |+| 2
+
+def add[M: Monoid](i: M)(j: M) = i |+| j
+
+val f = (add[Int] _).pure[Option].pure[Either[String, ?]]
+
+val ap1 = Applicative[Either[String, ?]].compose[Option].ap(f)(42.some.asRight)
+val ap2 = Applicative[Either[String, ?]].compose[Option].ap(ap1)(42.some.asRight)
+```
+
+--
+
+```tut
+42.asRight |+| 100.asRight
+
+42.asRight[String] |+| Left("explode")
+```
+
+---
+
+# Remarks
+
+--
+
+* For lots of things we can just ignore intermediate layers for tons of stuff and just work in terms of 'pure' values 
+
+--
+
+* Lifting functions is how we can do that (see also mapN in cats which is a nicer version of what I did previously)
 
  </textarea>
     <script src="remark-latest.min.js">
